@@ -9,41 +9,53 @@ import seaborn as sns
 from selenium import webdriver
 from selenium.webdriver.chrome.options import Options
 from selenium.webdriver.chrome.service import Service
+from selenium.webdriver.common.by import By
 from webdriver_manager.chrome import ChromeDriverManager
 
-st.set_page_config(page_title="Análise Avançada - Roleta", layout="centered")
-st.title("🎯 Simulador Roleta com Scraping (Betano + Evolution)")
+st.set_page_config(page_title="Roleta Betano - Scraping Real", layout="centered")
+st.title("🎯 Roleta ao Vivo - Betano (Scraping Real)")
 
-# Inicializa sessão
 if "resultados" not in st.session_state:
     st.session_state.resultados = []
 
-# Função de scraping simulada (ajustar seletor real depois)
-def capturar_numero_fake(site):
-    # Aqui o Selenium real será implementado depois para Betano e Evolution
-    import random
-    return random.choice(list(range(0, 37)))
+# Função de scraping real
+def capturar_numero_betano():
+    options = Options()
+    options.add_argument("--headless")
+    options.add_argument("--disable-gpu")
+    options.add_argument("--no-sandbox")
+    options.add_argument("--window-size=1920,1080")
 
-# Captura
-col1, col2 = st.columns(2)
-with col1:
-    if st.button("🎰 Capturar número - Betano"):
-        numero = capturar_numero_fake("betano")
+    driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
+
+    try:
+        url = "https://www.betano.bet.br/casino/live/games/immersive-roulette/1527/tables/"
+        driver.get(url)
+        time.sleep(10)  # Aguarda a página carregar completamente
+
+        xpath = '//*[@id="root"]/div/div/div[2]/div[8]/div[1]/div/div/div[2]/div/div/ul/li[3]/div'
+        elemento = driver.find_element(By.XPATH, xpath)
+        texto = elemento.text.strip()
+
+        numero = int(texto)
+        return numero
+    except Exception as e:
+        st.error(f"Erro ao capturar número: {e}")
+        return None
+    finally:
+        driver.quit()
+
+# Botão para capturar número real
+if st.button("🎰 Capturar número da Betano (Roleta Imersiva)"):
+    numero = capturar_numero_betano()
+    if numero is not None:
         st.session_state.resultados.append({
             "numero": numero,
             "fonte": "Betano",
             "hora": datetime.datetime.now()
         })
-with col2:
-    if st.button("🎥 Capturar número - Evolution"):
-        numero = capturar_numero_fake("evolution")
-        st.session_state.resultados.append({
-            "numero": numero,
-            "fonte": "Evolution",
-            "hora": datetime.datetime.now()
-        })
 
-# Mostra resultados
+# Exibe resultados e gráficos
 if st.session_state.resultados:
     df = pd.DataFrame(st.session_state.resultados)
     df["cor"] = df["numero"].apply(lambda x: "Verde" if x == 0 else "Vermelho" if x in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else "Preto")
@@ -53,7 +65,6 @@ if st.session_state.resultados:
     st.subheader("📋 Últimos números")
     st.dataframe(df.tail(20))
 
-    # Gráficos
     st.subheader("📊 Frequência por número")
     fig1, ax1 = plt.subplots(figsize=(10,3))
     sns.countplot(x="numero", data=df, palette="viridis", ax=ax1)
@@ -74,7 +85,6 @@ if st.session_state.resultados:
     sns.countplot(x="dúzia", data=df, palette="Set1", ax=ax4)
     st.pyplot(fig4)
 
-    # Exportação
     st.download_button("📥 Exportar CSV", data=df.to_csv(index=False), file_name="resultados_roleta.csv", mime="text/csv")
 
 else:
