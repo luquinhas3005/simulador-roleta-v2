@@ -3,63 +3,79 @@ import streamlit as st
 import pandas as pd
 import datetime
 import time
+import matplotlib.pyplot as plt
+import seaborn as sns
+
 from selenium import webdriver
-from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
+from selenium.webdriver.chrome.service import Service
 from webdriver_manager.chrome import ChromeDriverManager
 
-st.set_page_config(page_title="Roleta com Scraping Corrigido", layout="centered")
+st.set_page_config(page_title="Análise Avançada - Roleta", layout="centered")
+st.title("🎯 Simulador Roleta com Scraping (Betano + Evolution)")
 
-# Sessão
-if "historico" not in st.session_state:
-    st.session_state.historico = []
-if "saldo" not in st.session_state:
-    st.session_state.saldo = 1000.0
+# Inicializa sessão
+if "resultados" not in st.session_state:
+    st.session_state.resultados = []
 
-st.title("🎯 Roleta Evolution com Scraping (Blaze) Corrigido")
+# Função de scraping simulada (ajustar seletor real depois)
+def capturar_numero_fake(site):
+    # Aqui o Selenium real será implementado depois para Betano e Evolution
+    import random
+    return random.choice(list(range(0, 37)))
 
-# Função corrigida de scraping
-def capturar_numero_blaze():
-    options = Options()
-    options.add_argument('--headless')
-    options.add_argument('--no-sandbox')
-    options.add_argument('--disable-dev-shm-usage')
+# Captura
+col1, col2 = st.columns(2)
+with col1:
+    if st.button("🎰 Capturar número - Betano"):
+        numero = capturar_numero_fake("betano")
+        st.session_state.resultados.append({
+            "numero": numero,
+            "fonte": "Betano",
+            "hora": datetime.datetime.now()
+        })
+with col2:
+    if st.button("🎥 Capturar número - Evolution"):
+        numero = capturar_numero_fake("evolution")
+        st.session_state.resultados.append({
+            "numero": numero,
+            "fonte": "Evolution",
+            "hora": datetime.datetime.now()
+        })
 
-    try:
-        driver = webdriver.Chrome(service=Service(ChromeDriverManager().install()), options=options)
-        driver.get("https://blaze.com/pt/games/double")
-        time.sleep(6)  # Aguarda carregar
+# Mostra resultados
+if st.session_state.resultados:
+    df = pd.DataFrame(st.session_state.resultados)
+    df["cor"] = df["numero"].apply(lambda x: "Verde" if x == 0 else "Vermelho" if x in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else "Preto")
+    df["paridade"] = df["numero"].apply(lambda x: "Zero" if x == 0 else "Par" if x % 2 == 0 else "Ímpar")
+    df["dúzia"] = df["numero"].apply(lambda x: "0" if x == 0 else "1ª" if x <= 12 else "2ª" if x <= 24 else "3ª")
 
-        # Captura o último número da roleta
-        bolas = driver.find_elements("class name", "entry")
-        ultimos_numeros = [b.text.strip() for b in bolas if b.text.strip().isdigit()]
+    st.subheader("📋 Últimos números")
+    st.dataframe(df.tail(20))
 
-        driver.quit()
+    # Gráficos
+    st.subheader("📊 Frequência por número")
+    fig1, ax1 = plt.subplots(figsize=(10,3))
+    sns.countplot(x="numero", data=df, palette="viridis", ax=ax1)
+    st.pyplot(fig1)
 
-        if not ultimos_numeros:
-            return "Não foi possível encontrar número na tela."
+    st.subheader("🎨 Frequência por cor")
+    fig2, ax2 = plt.subplots()
+    sns.countplot(x="cor", data=df, palette={"Vermelho": "red", "Preto": "black", "Verde": "green"}, ax=ax2)
+    st.pyplot(fig2)
 
-        return int(ultimos_numeros[-1])  # Pega o último número válido
-    except Exception as e:
-        driver.quit()
-        return f"Erro: {e}"
+    st.subheader("🧮 Frequência por paridade")
+    fig3, ax3 = plt.subplots()
+    sns.countplot(x="paridade", data=df, palette="Set2", ax=ax3)
+    st.pyplot(fig3)
 
-# Botão para scraping
-if st.button("📡 Capturar número ao vivo"):
-    numero = capturar_numero_blaze()
-    if isinstance(numero, int):
-        st.session_state.historico.append({"numero": numero, "data": datetime.datetime.now()})
-        st.success(f"Número capturado: {numero}")
-    else:
-        st.error(numero)
+    st.subheader("📦 Frequência por dúzia")
+    fig4, ax4 = plt.subplots()
+    sns.countplot(x="dúzia", data=df, palette="Set1", ax=ax4)
+    st.pyplot(fig4)
 
-# Exibir histórico
-if st.session_state.historico:
-    df = pd.DataFrame(st.session_state.historico)
-    df["Cor"] = df["numero"].apply(lambda x: "Verde" if x == 0 else "Vermelho" if x in [1,3,5,7,9,12,14,16,18,19,21,23,25,27,30,32,34,36] else "Preto")
-    df["Par/Ímpar"] = df["numero"].apply(lambda x: "Zero" if x == 0 else "Par" if x % 2 == 0 else "Ímpar")
+    # Exportação
+    st.download_button("📥 Exportar CSV", data=df.to_csv(index=False), file_name="resultados_roleta.csv", mime="text/csv")
 
-    st.subheader("📊 Últimos resultados")
-    st.dataframe(df.tail(10))
 else:
     st.info("Nenhum número capturado ainda.")
